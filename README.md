@@ -1,68 +1,52 @@
-import platform
 import os
-import psutil
-import cpuinfo
+from collections import defaultdict
 
-def get_system_info():
-    # OS and kernel information
-    os_info = platform.uname()
-    system_info = {
-        "System": os_info.system,
-        "Node Name": os_info.node,
-        "Release": os_info.release,
-        "Version": os_info.version,
-        "Machine": os_info.machine,
-        "Processor": os_info.processor,
-    }
+def get_size(start_path='.'):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(start_path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            # Skip if it is symbolic link
+            if not os.path.islink(fp):
+                total_size += os.path.getsize(fp)
+    return total_size
 
-    # Detailed processor information
-    cpu_info = cpuinfo.get_cpu_info()
-    cpu_details = {
-        "CPU": cpu_info.get("brand_raw", "Unknown"),
-        "Architecture": cpu_info.get("arch", "Unknown"),
-        "Cores (Physical)": psutil.cpu_count(logical=False),
-        "Cores (Logical)": psutil.cpu_count(logical=True),
-        "Frequency": f"{psutil.cpu_freq().current:.2f} MHz",
-    }
+def find_large_files_and_directories(start_path='.', num_results=10):
+    file_sizes = []
+    dir_sizes = defaultdict(int)
 
-    # Memory information
-    virtual_mem = psutil.virtual_memory()
-    memory_info = {
-        "Total Memory": f"{virtual_mem.total / (1024 ** 3):.2f} GB",
-        "Available Memory": f"{virtual_mem.available / (1024 ** 3):.2f} GB",
-        "Used Memory": f"{virtual_mem.used / (1024 ** 3):.2f} GB",
-        "Memory Usage": f"{virtual_mem.percent}%",
-    }
+    # Walk through directory
+    for dirpath, dirnames, filenames in os.walk(start_path):
+        # Calculate total size for current directory
+        dir_total = 0
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            try:
+                size = os.path.getsize(fp)
+            except OSError:
+                size = 0
+            file_sizes.append((size, fp))
+            dir_total += size
+        dir_sizes[dirpath] += dir_total
 
-    # Disk information
-    disk_info = psutil.disk_usage('/')
-    disk_details = {
-        "Total Disk Space": f"{disk_info.total / (1024 ** 3):.2f} GB",
-        "Used Disk Space": f"{disk_info.used / (1024 ** 3):.2f} GB",
-        "Free Disk Space": f"{disk_info.free / (1024 ** 3):.2f} GB",
-        "Disk Usage": f"{disk_info.percent}%",
-    }
+    # Sort and retrieve top results
+    largest_files = sorted(file_sizes, key=lambda x: x[0], reverse=True)[:num_results]
+    largest_dirs = sorted(dir_sizes.items(), key=lambda x: x[1], reverse=True)[:num_results]
 
-    # Display information
-    print("\nSystem Information")
-    print("-" * 30)
-    for key, value in system_info.items():
-        print(f"{key}: {value}")
+    # Display results
+    print("\nLargest Files:")
+    for size, filepath in largest_files:
+        print(f"{size / (1024 ** 2):.2f} MB\t{filepath}")
 
-    print("\nProcessor Information")
-    print("-" * 30)
-    for key, value in cpu_details.items():
-        print(f"{key}: {value}")
-
-    print("\nMemory Information")
-    print("-" * 30)
-    for key, value in memory_info.items():
-        print(f"{key}: {value}")
-
-    print("\nDisk Information")
-    print("-" * 30)
-    for key, value in disk_details.items():
-        print(f"{key}: {value}")
+    print("\nLargest Directories:")
+    for dirpath, size in largest_dirs:
+        print(f"{size / (1024 ** 2):.2f} MB\t{dirpath}")
 
 if __name__ == "__main__":
-    get_system_info()
+    start_path = input("Enter the directory to analyze (default is current directory): ").strip()
+    num_results = input("Enter the number of top results to display (default is 10): ").strip()
+    
+    start_path = start_path if start_path else '.'
+    num_results = int(num_results) if num_results else 10
+    
+    find_large_files_and_directories(start_path, num_results)
