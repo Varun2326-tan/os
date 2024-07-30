@@ -1,52 +1,57 @@
+from google.colab import drive
 import os
 from collections import defaultdict
 
-def get_size(start_path='.'):
+# Mount Google Drive
+drive.mount('/content/drive')
+
+def get_directory_size(path):
+    """Calculate the total size of the given directory."""
     total_size = 0
-    for dirpath, dirnames, filenames in os.walk(start_path):
-        for f in filenames:
-            fp = os.path.join(dirpath, f)
-            # Skip if it is symbolic link
-            if not os.path.islink(fp):
-                total_size += os.path.getsize(fp)
+    for dirpath, dirnames, filenames in os.walk(path):
+        for filename in filenames:
+            try:
+                filepath = os.path.join(dirpath, filename)
+                total_size += os.path.getsize(filepath)
+            except FileNotFoundError:
+                continue
     return total_size
 
-def find_large_files_and_directories(start_path='.', num_results=10):
-    file_sizes = []
-    dir_sizes = defaultdict(int)
+def analyze_filesystem(path, size_threshold):
+    """Analyze the filesystem structure and usage."""
+    total_size = get_directory_size(path)
+    print(f"Total size of '{path}': {total_size / (1024 * 1024):.2f} MB\n")
 
-    # Walk through directory
-    for dirpath, dirnames, filenames in os.walk(start_path):
-        # Calculate total size for current directory
-        dir_total = 0
-        for f in filenames:
-            fp = os.path.join(dirpath, f)
+    large_files = []
+    directory_sizes = defaultdict(int)
+
+    for dirpath, dirnames, filenames in os.walk(path):
+        dir_size = 0
+        for filename in filenames:
             try:
-                size = os.path.getsize(fp)
-            except OSError:
-                size = 0
-            file_sizes.append((size, fp))
-            dir_total += size
-        dir_sizes[dirpath] += dir_total
+                filepath = os.path.join(dirpath, filename)
+                file_size = os.path.getsize(filepath)
+                dir_size += file_size
+                if file_size > size_threshold:
+                    large_files.append((filepath, file_size))
+            except FileNotFoundError:
+                continue
+        directory_sizes[dirpath] += dir_size
 
-    # Sort and retrieve top results
-    largest_files = sorted(file_sizes, key=lambda x: x[0], reverse=True)[:num_results]
-    largest_dirs = sorted(dir_sizes.items(), key=lambda x: x[1], reverse=True)[:num_results]
+    print("Large Files:")
+    for filepath, file_size in large_files:
+        print(f"{filepath}: {file_size / (1024 * 1024):.2f} MB")
 
-    # Display results
-    print("\nLargest Files:")
-    for size, filepath in largest_files:
-        print(f"{size / (1024 ** 2):.2f} MB\t{filepath}")
-
-    print("\nLargest Directories:")
-    for dirpath, size in largest_dirs:
-        print(f"{size / (1024 ** 2):.2f} MB\t{dirpath}")
+    print("\nDirectory Sizes:")
+    for dirpath, dir_size in sorted(directory_sizes.items(), key=lambda x: x[1], reverse=True):
+        if dir_size > size_threshold:
+            print(f"{dirpath}: {dir_size / (1024 * 1024):.2f} MB")
 
 if __name__ == "__main__":
-    start_path = input("Enter the directory to analyze (default is current directory): ").strip()
-    num_results = input("Enter the number of top results to display (default is 10): ").strip()
+    # Set the path to the directory you want to analyze
+    # For example, to analyze the root of the Google Drive:
+    directory_to_analyze = "/content/drive/My Drive/"
     
-    start_path = start_path if start_path else '.'
-    num_results = int(num_results) if num_results else 10
-    
-    find_large_files_and_directories(start_path, num_results)
+    # Set the size threshold for large files and directories (in bytes)
+    size_threshold = 50 * 1024 * 1024  # 50 MB
+    analyze_filesystem(directory_to_analyze, size_threshold)
