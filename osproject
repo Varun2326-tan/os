@@ -1,0 +1,76 @@
+import os
+
+def get_size(start_path):
+    """Returns the total size of a directory or a file."""
+    total_size = 0
+    if os.path.isfile(start_path):
+        return os.path.getsize(start_path)
+    for dirpath, dirnames, filenames in os.walk(start_path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            if not os.path.islink(fp):
+                total_size += os.path.getsize(fp)
+    return total_size
+
+def analyze_filesystem(start_path, size_threshold):
+    """Analyzes the filesystem structure and usage."""
+    large_files = []
+    large_dirs = []
+    num_files = 0
+    num_dirs = 0
+    total_size = 0
+
+    for dirpath, dirnames, filenames in os.walk(start_path):
+        # Check directories first
+        num_dirs += 1
+        dir_size = get_size(dirpath)
+        total_size += dir_size
+        if dir_size > size_threshold:
+            large_dirs.append((dirpath, dir_size))
+
+        # Check files next
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            if os.path.isfile(fp) and not os.path.islink(fp):
+                file_size = os.path.getsize(fp)
+                total_size += file_size
+                num_files += 1
+                if file_size > size_threshold:
+                    large_files.append((fp, file_size))
+
+    return large_files, large_dirs, num_files, num_dirs, total_size
+
+def format_size(size):
+    """Formats the size in a human-readable format (KB, MB, GB)."""
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if size < 1024:
+            return f"{size:.2f} {unit}"
+        size /= 1024
+
+def print_results(large_files, large_dirs, num_files, num_dirs, total_size):
+    """Prints the results of the filesystem analysis."""
+    print(f"Total number of files: {num_files}")
+    print(f"Total number of directories: {num_dirs}")
+    print(f"Total size: {format_size(total_size)}")
+
+    if large_files:
+        print("\nLarge Files:")
+        for file_path, size in large_files:
+            print(f"{file_path}: {format_size(size)}")
+    else:
+        print("\nNo large files found.")
+
+    if large_dirs:
+        print("\nLarge Directories:")
+        for dir_path, size in large_dirs:
+            print(f"{dir_path}: {format_size(size)}")
+    else:
+        print("\nNo large directories found.")
+
+if __name__ == "__main__":
+    start_path = input("Enter the directory path to analyze: ")
+    size_threshold = int(input("Enter the size threshold in bytes: "))
+
+    large_files, large_dirs, num_files, num_dirs, total_size = analyze_filesystem(start_path, size_threshold)
+    print_results(large_files, large_dirs, num_files, num_dirs, total_size)
+
