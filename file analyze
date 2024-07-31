@@ -1,77 +1,76 @@
 import os
-from collections import Counter
 
-def analyze_text_file(C:/Users/HI/Desktop/tanu):
-    try:
-        with open(file_path, 'r', encoding='utf-8') as file:
-            content = file.read()
-        
-        # Number of lines
-        num_lines = len(content.splitlines())
-        
-        # Number of words
-        words = content.split()
-        num_words = len(words)
-        
-        # Number of characters
-        num_chars = len(content)
-        
-        # Frequency of each word (excluding case)
-        word_freq = Counter(word.lower() for word in words)
-        
-        return {
-            "lines": num_lines,
-            "words": num_words,
-            "characters": num_chars,
-            "word_frequency": word_freq
-        }
-    
-    except FileNotFoundError:
-        return "File not found. Please provide a valid file path."
-    except Exception as e:
-        return f"An error occurred: {e}"
+def get_size(start_path):
+    """Returns the total size of a directory or a file."""
+    total_size = 0
+    if os.path.isfile(start_path):
+        return os.path.getsize(start_path)
+    for dirpath, dirnames, filenames in os.walk(start_path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            if not os.path.islink(fp):
+                total_size += os.path.getsize(fp)
+    return total_size
 
-def analyze_directory(directory_path):
-    if not os.path.isdir(directory_path):
-        return "Invalid directory path."
+def analyze_filesystem(start_path, size_threshold):
+    """Analyzes the filesystem structure and usage."""
+    large_files = []
+    large_dirs = []
+    num_files = 0
+    num_dirs = 0
+    total_size = 0
 
-    files_info = []
+    for dirpath, dirnames, filenames in os.walk(start_path):
+        # Check directories first
+        num_dirs += 1
+        dir_size = get_size(dirpath)
+        total_size += dir_size
+        if dir_size > size_threshold:
+            large_dirs.append((dirpath, dir_size))
 
-    for root, _, files in os.walk(directory_path):
-        for file_name in files:
-            file_path = os.path.join(root, file_name)
-            file_size = os.path.getsize(file_path)
-            file_info = {
-                "file_name": file_name,
-                "file_path": file_path,
-                "file_size": file_size
-            }
+        # Check files next
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            if os.path.isfile(fp) and not os.path.islink(fp):
+                file_size = os.path.getsize(fp)
+                total_size += file_size
+                num_files += 1
+                if file_size > size_threshold:
+                    large_files.append((fp, file_size))
 
-            # Analyze if the file is a text file
-            if file_name.lower().endswith('.txt'):
-                analysis = analyze_text_file(file_path)
-                if isinstance(analysis, dict):
-                    file_info.update(analysis)
-                else:
-                    file_info["error"] = analysis
+    return large_files, large_dirs, num_files, num_dirs, total_size
 
-            files_info.append(file_info)
+def format_size(size):
+    """Formats the size in a human-readable format (KB, MB, GB)."""
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if size < 1024:
+            return f"{size:.2f} {unit}"
+        size /= 1024
 
-    return files_info
+def print_results(large_files, large_dirs, num_files, num_dirs, total_size):
+    """Prints the results of the filesystem analysis."""
+    print(f"Total number of files: {num_files}")
+    print(f"Total number of directories: {num_dirs}")
+    print(f"Total size: {format_size(total_size)}")
 
-# Example usage
-directory_path = 'C:/Users/HI/Desktop/fwd'  # Replace with your directory path
-result = analyze_directory(directory_path)
+    if large_files:
+        print("\nLarge Files:")
+        for file_path, size in large_files:
+            print(f"{file_path}: {format_size(size)}")
+    else:
+        print("\nNo large files found.")
 
-for file_info in result:
-    print(f"File: {file_info['file_name']}")
-    print(f"Path: {file_info['file_path']}")
-    print(f"Size: {file_info['file_size']} bytes")
-    if 'lines' in file_info:
-        print(f"Lines: {file_info['lines']}")
-        print(f"Words: {file_info['words']}")
-        print(f"Characters: {file_info['characters']}")
-        print(f"Word Frequency: {file_info['word_frequency']}")
-    if 'error' in file_info:
-        print(f"Error: {file_info['error']}")
-    print("\n")
+    if large_dirs:
+        print("\nLarge Directories:")
+        for dir_path, size in large_dirs:
+            print(f"{dir_path}: {format_size(size)}")
+    else:
+        print("\nNo large directories found.")
+
+if __name__ == "__main__":
+    start_path = input("Enter the directory path to analyze: ")
+    size_threshold = int(input("Enter the size threshold in bytes: "))
+
+    large_files, large_dirs, num_files, num_dirs, total_size = analyze_filesystem(start_path, size_threshold)
+    print_results(large_files, large_dirs, num_files, num_dirs, total_size)
+
