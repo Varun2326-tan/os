@@ -60,7 +60,7 @@ def analyze_directory(directory_path):
     return files_info
 
 # Example usage
-directory_path = '/path/to/directory'  # Replace with your directory path
+directory_path = 'C:/Users/HI/Desktop'  # Replace with your directory path
 result = analyze_directory(directory_path)
 
 for file_info in result:
